@@ -1,0 +1,13 @@
+jenkins:
+  systemMessage: "Mars Rover CI Server"
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: admin123
+  authorizationStrategy:
+    loggedInUsersCanDoAnything: true
+
+jobs:
+  - file: /var/jenkins_home/jobs/mars/config.xml

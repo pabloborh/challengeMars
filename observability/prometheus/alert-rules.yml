@@ -1,0 +1,45 @@
+groups:
+  - name: wind-speed-alerts
+    rules:
+      - alert: HighWindSpeed
+        expr: wind_speed > 180
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rover {{ $labels.rover_name }} reporting high wind"
+          description: "Wind speed is {{ $value }} kph for rover {{ $labels.rover_name }} (threshold: >180 kph = 50m/s)"
+
+      - alert: MissingWindSpeedDataPerRover
+        expr: count(count_over_time(wind_speed[5m])) by (rover_name) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No wind speed data for rover {{ $labels.rover_name }}"
+          description: |
+            No wind speed metrics have been received for rover {{ $labels.rover_name }} in the last 5 minutes.
+
+
+  - name: temperature-alerts
+    rules:
+      - alert: AbnormalTemperature
+        expr: temperature > 20 or temperature < -80
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Rover {{ $labels.rover_name }} reporting abnormal temperature"
+          description: |
+            Temperature for rover {{ $labels.rover_name }} is {{ $value }}°C.
+            Expected range: -80°C to 20°C.
+
+      - alert: MissingTemperatureDataPerRover
+        expr: count(count_over_time(temperature[5m])) by (rover_name) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No temperature data for rover {{ $labels.rover_name }}"
+          description: |
+            No temperature metrics have been received for rover {{ $labels.rover_name }} in the last 5 minutes.

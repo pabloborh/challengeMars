@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mars-rover-fleet-tracker.fullname" . }}
+  labels:
+    app: {{ include "mars-rover-fleet-tracker.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "mars-rover-fleet-tracker.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mars-rover-fleet-tracker.fullname" . }}
+    spec:
+      containers:
+        - name: mars-rover-fleet-tracker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.command }}
+          command: {{ toJson .Values.command }}
+          {{- end }}
+          ports:
+            - containerPort: 3000
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ if eq .Values.environment "prod" }}10{{ else }}5{{ end }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ if eq .Values.environment "prod" }}5{{ else }}2{{ end }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if and (eq .Values.environment "prod") .Values.affinity.enabled }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ include "mars-rover-fleet-tracker.fullname" . }}
+                topologyKey: "topology.kubernetes.io/zone"
+      {{- end }}
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}

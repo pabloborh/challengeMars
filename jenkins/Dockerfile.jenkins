@@ -1,0 +1,23 @@
+FROM jenkins/jenkins:lts
+
+USER root
+
+# Instalar Docker CLI
+RUN apt-get update && apt-get install -y docker.io curl
+
+# Instalar Node.js 20.x y npm compatible
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@11.4.1
+
+# Instalar plugins Jenkins esenciales
+RUN jenkins-plugin-cli --plugins workflow-aggregator docker-workflow git matrix-auth credentials-binding ws-cleanup
+
+# Instalar aws cli
+RUN apt-get install -y awscli
+
+# Eliminar asistente en inicio
+ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+
+# Volver a usuario jenkins
+USER jenkins

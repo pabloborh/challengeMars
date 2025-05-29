@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mars-rover-fleet-tracker
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: 'https://repo-git.com/helm-chart-repo.git' 
+    targetRevision: main  
+    path: 'charts/mars-rover-fleet-tracker'
+
+    helm:
+      valueFiles:
+        - values-prod.yaml
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: mars-rover-fleet-tracker
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

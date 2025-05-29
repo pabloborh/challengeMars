@@ -1,0 +1,30 @@
+replicaCount: 3
+
+image:
+  repository: your-registry/mars-rover-fleet-tracker
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+environment: prod
+
+affinity:
+  enabled: true
+
+nodeSelector: {}
+
+tolerations: []
+
+ingress:
+  enabled: false

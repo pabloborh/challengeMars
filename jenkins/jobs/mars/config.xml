@@ -1,0 +1,115 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1520.v56d65e3b_4566">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2255.v56a_15e805f12"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2255.v56a_15e805f12">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4106.v7a_8a_8176d450">
+    <script>
+      
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME_BASE = &quot;mars-rover-fleet-tracker&quot;
+        AWS_REGION = &quot;eu-west-1&quot;
+        AWS_ACCOUNT_ID = &quot;123456789012&quot; // Cambia aquí
+        ECR_REPO = &quot;${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME_BASE}&quot;
+        GIT_REPO_URL = &quot;git@github.com:tu-org/argocd-configs.git&quot; // Repo donde actualizas ArgoCD
+        GIT_CREDENTIALS_ID = &quot;git-ssh-credentials&quot; // Credenciales Jenkins para git push
+        VALUES_YAML_PATH = &quot;mars-rover/values.yaml&quot; // Ruta en el repo donde estará el values.yaml
+    }
+
+    stages {
+        stage(&apos;Checkout Mars Rover&apos;) {
+            steps {
+                git url: &apos;https://github.com/Avantio/mars-rover-fleet-tracker.git&apos;, branch: &apos;main&apos;
+            }
+        }
+
+        stage(&apos;Install dependencies&apos;) {
+            steps {
+                sh &apos;npm ci&apos;
+            }
+        }
+
+        stage(&apos;Run tests&apos;) {
+            steps {
+                sh &apos;npm test&apos;
+            }
+        }
+
+        stage(&apos;Build Docker Image&apos;) {
+            steps {
+                script {
+                    COMMIT_HASH = sh(script: &quot;git rev-parse --short HEAD&quot;, returnStdout: true).trim()
+                    IMAGE_TAG = &quot;${IMAGE_NAME_BASE}:${COMMIT_HASH}&quot;
+                    echo &quot;Building Docker image: ${IMAGE_TAG}&quot;
+                    sh &quot;docker build -t ${IMAGE_TAG} .&quot;
+                }
+            }
+        }
+
+        stage(&apos;Push to AWS ECR&apos;) {
+            steps {
+                script {
+                    withCredentials([[
+                        $class: &apos;AmazonWebServicesCredentialsBinding&apos;,
+                        credentialsId: &apos;aws-ecr-creds&apos;, // ID credenciales AWS en Jenkins
+                        accessKeyVariable: &apos;AWS_ACCESS_KEY_ID&apos;,
+                        secretKeyVariable: &apos;AWS_SECRET_ACCESS_KEY&apos;
+                    ]]) {
+                        sh &quot;&quot;&quot;
+                          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}
+                          docker tag ${IMAGE_TAG} ${ECR_REPO}:${COMMIT_HASH}
+                          docker push ${ECR_REPO}:${COMMIT_HASH}
+                        &quot;&quot;&quot;
+                    }
+                }
+            }
+        }
+
+        stage(&apos;Update ArgoCD Config Repo&apos;) {
+            steps {
+                script {
+                    sh &quot;git clone ${GIT_REPO_URL} argocd-configs&quot;
+                    dir(&apos;argocd-configs&apos;) {
+                        sh &apos;git config user.email &quot;jenkins@example.com&quot;&apos;
+                        sh &apos;git config user.name &quot;Jenkins CI&quot;&apos;
+
+                        // Usamos sed para cambiar solo la línea tag dentro de image:
+                        sh &quot;&quot;&quot;
+                        sed -i &apos;/^image:/,/^\\s*[^ ]/ s/^\\s*tag:.*/  tag: ${COMMIT_HASH}/&apos; ${VALUES_YAML_PATH}
+                        &quot;&quot;&quot;
+
+                        sh &quot;&quot;&quot;
+                        git add ${VALUES_YAML_PATH}
+                        git commit -m &quot;Update Mars Rover image tag to ${COMMIT_HASH}&quot;
+                        git push origin main
+                        &quot;&quot;&quot;
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
+      
+    </script>
+    <sandbox>true</sandbox>
+  </definition>
+  <disabled>false</disabled>
+</flow-definition>
